@@ -1,0 +1,59 @@
+﻿Bài 9: So sánh và lựa chọn giải pháp tối ưu cho xử lý log tự động 
+Phần 1: Phân tích & Đề xuất đa giải pháp
+* Input:
+* Thư mục cần quét: /var/logs/
+* Từ khóa tìm kiếm: TIMEOUT
+
+
+* Output:
+* Danh sách kết quả gồm: Tên đường dẫn file, Số thứ tự dòng chứa lỗi và nội dung dòng log chứa lỗi
+* Format mẫu mong muốn: [Đường_dẫn_file]:[Số_dòng]: [Nội_dung_dòng_log].
+
+
+*  Đề xuất 2 giải pháp:
+* Giải pháp 1: (findstr - Tiện ích tích hợp CMD/Windows): Dùng công cụ dòng lệnh native findstr của Windows với cờ đệ quy (/S), cờ in số dòng (/N) và cờ không phân biệt hoa thường (/I).
+* Giải pháp 2:  (PowerShell kết hợp Get-ChildItem + Try/Catch): Duyệt từng file log bằng Get-ChildItem, dùng -ErrorAction SilentlyContinue để bỏ qua triệt để các file đang bị tiến trình khác khóa (bẫy dữ liệu).
+
+
+Phần 2: So sánh & Lựa chọn
+
+
+
+
+Tiêu chí 
+	Giải pháp 1 (findstr CMD) 
+	Giải pháp 2 (PowerShell Select-String) 
+	Giải pháp 3 (Get-ChildItem + Select-String kèm xử lý lỗi) 
+	Tốc độ xử lý
+	Rất nhanh
+	Trung bình - Nhanh 
+	Trung bình 
+	Xử lý file bị khóa
+	Bị ngắt quãng/báo lỗi truy cập ra stderr, khó can thiệp linh hoạt nếu gặp file bị lock chặt
+	Có thể bỏ qua lỗi bằng tham số -ErrorAction SilentlyContinue (để né bẫy — gặp file nào bị khóa/không mở được thì bỏ qua, tiếp tục quét file kế tiếp thay vì dừng lại.) 
+	Xử lý rất tốt, kiểm soát mượt mà và không dừng script
+	Cross-platform
+	Kém (chỉ hỗ trợ trên Windows OS)
+	Tốt (chạy được trên Windows, macOS, Linux qua PowerShell 7+)
+	Tốt (tương thích đa nền tảng với PowerShell Core)
+	Độ phức tạp code
+	Rất thấp (1 dòng lệnh ngắn gọn)
+	Thấp (1 dòng lệnh trực tiếp)
+	Trung bình (cần viết cấu trúc lọc file và bắt lỗi bài bản)
+	Hiển thị số dòng
+	Hỗ trợ tốt (/N)
+	Tích hợp sẵn (thuộc tính LineNumber)
+	Tích hợp sẵn (thuộc tính LineNumber)
+	
+
+Phần 3: Triển Khai
+Giải pháp chọn: PowerShell (Get-ChildItem + Get-Content + Select-String + try/catch).
+Lý do: Xử lý log tự động cần kết quả đủ và không dừng giữa chừng. PowerShell có sẵn LineNumber, kiểm soát lỗi từng file, chạy được đa nền tảng (PowerShell 7+). Chậm hơn findstr một chút nhưng ổn định hơn.
+Câu lệnh:
+Get-ChildItem "C:\var\logs" -Recurse -File | Select-String "TIMEOUT" | ForEach-Object { "_.Path):_.LineNumber): _.Line.Trim())" }
+
+
+Xử lý 2 bẫy:
+* File bị khóa: Get-Content đọc được file đang được ghi. Nếu vẫn lỗi thì try/catch bỏ qua, cảnh báo và quét tiếp.
+* Hoa/thường: Select-String mặc định không phân biệt hoa thường, nên bắt cả TIMEOUT, Timeout, timeout.
+Sửa so với bản cũ: thêm -File (bỏ thư mục), và đưa việc bắt lỗi vào đúng bước đọc file (-ErrorAction trên Select-String không có tác dụng với lỗi mở file).
